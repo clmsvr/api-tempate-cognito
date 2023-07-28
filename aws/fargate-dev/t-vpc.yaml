@@ -1,0 +1,117 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  Prefix:
+    Type: String
+
+  VPCCidrBlock:
+    Type: String
+
+  CidrIp1:
+    Type: String
+
+  CidrIp2:
+    Type: String
+    
+
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCidrBlock
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+
+  IGW:
+    Type: AWS::EC2::InternetGateway
+  
+  IGWAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref IGW
+      
+# Livro:      
+# Traffic between subnets of a VPC is always routed by default. You can’t remove the routes between the subnets. 
+# If you want to prevent traffic between subnets in a VPC, you need to use NACLs attached to the subnets.
+# We do recommend to start with using security groups to control traffic. 
+# If you want to add an extra layer of security, you should use NACLs on top. But doing so is optional.
+
+# Subnets publicas tem uma rota para o IGW
+# Subnets privadas tem uma rota para o NATGateway
+
+# Internet Gateway (IGW) allows instances with public IPs to access the internet.
+# NAT Gateway (NGW) allows instances with no public IPs to access the internet.
+# A comunicação do NGW com a internet também e feita via IGW.
+
+# If data is transferred over the internet to reach AWS services (such as Amazon S3 and Amazon DynamoDB), 
+# use gateway VPC endpoints. These endpoints allow your EC2 instances to communicate with S3 and
+# DynamoDB directly and at no additional charge.
+# A comunicação da rede privada via VPC Endpoins com serviços AWS não precisa do IGW.
+
+# Neste template:
+# 2 subnets publicas
+# 2 subnets privates
+# 1 route table para as 2 subnets publicas
+# 1 route table para as 2 subnets privadas
+
+#########
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref CidrIp1
+      VpcId: !Ref VPC
+      MapPublicIpOnLaunch: true   # Default 'false'.Indicates whether instances launched in this subnet receive a public IPv4 address. 
+                                  # Faz a Subnet ser Pública, juntamente com a rota para o IGW.
+      AvailabilityZone: !Select [0, !GetAZs '']
+                        # Especificar uma string vazia é equivalente a especificar AWS::Region.
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref CidrIp2
+      VpcId: !Ref VPC
+      MapPublicIpOnLaunch: true   
+      AvailabilityZone: !Select [1, !GetAZs '']
+                        
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      
+  RouteToInternet:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref IGW
+  
+  PublicSubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+
+Outputs:
+  VPC:
+    Value: !Ref VPC
+    Export:
+      Name: !Sub ${Prefix}-vpc      
+
+  PublicSubnet1:
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: !Sub ${Prefix}-public-subnet1
+
+  PublicSubnet2:
+    Value: !Ref PublicSubnet2
+    Export:
+      Name: !Sub ${Prefix}-public-subnet2      

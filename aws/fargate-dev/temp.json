@@ -1,0 +1,54 @@
+{
+    "Exports": [
+        {
+            "ExportingStackId": "arn:aws:cloudformation:us-east-1:232762117680:stack/tpl-01-ecr-stack/89b9c020-1482-11ee-b3f3-0af5e9ffdb6b",
+            "Name": "tpl-01-erc-repository-fullname",
+            "Value": "232762117680.dkr.ecr.us-east-1.amazonaws.com/tpl-01-repository"
+        },
+        {
+            "ExportingStackId": "arn:aws:cloudformation:us-east-1:232762117680:stack/tpl-01-ecr-stack/89b9c020-1482-11ee-b3f3-0af5e9ffdb6b",
+            "Name": "tpl-01-erc-repository-id",
+            "Value": "tpl-01-repository"
+        },
+        {
+            "ExportingStackId": "arn:aws:cloudformation:us-east-1:232762117680:stack/tpl-01-ecr-stack/89b9c020-1482-11ee-b3f3-0af5e9ffdb6b",
+            "Name": "tpl-01-erc-repository-login",
+            "Value": "232762117680.dkr.ecr.us-east-1.amazonaws.com"
+        },
+        {
+            "ExportingStackId": "arn:aws:cloudformation:us-east-1:232762117680:stack/tpl-01-ecr-stack/89b9c020-1482-11ee-b3f3-0af5e9ffdb6b",
+            "Name": "tpl-01-erc-repository-name",
+            "Value": "tpl-01-repository"
+        },
+        {
+            "ExportingStackId": "arn:aws:cloudformation:us-east-1:232762117680:stack/tpl-01-vpc-stack/c8385f10-1454-11ee-96ef-0a192df2045d",
+            "Name": "tpl-01-public-subnet1",
+            "Value": "subnet-084fff57e645916e1"
+        },
+        {
+            "ExportingStackId": "arn:aws:cloudformation:us-east-1:232762117680:stack/tpl-01-vpc-stack/c8385f10-1454-11ee-96ef-0a192df2045d",
+            "Name": "tpl-01-public-subnet2",
+            "Value": "subnet-026305afdcf3db891"
+        },
+        {
+            "ExportingStackId": "arn:aws:cloudformation:us-east-1:232762117680:stack/tpl-01-rds-stack/7e9e8e00-1455-11ee-aaea-0ec11d87e8a5",
+            "Name": "tpl-01-rds-endpoint",
+            "Value": "tpl-01-rds-stack-database-szy69rm435xp.clnx2amo9jiw.us-east-1.rds.amazonaws.com"
+        },
+        {
+            "ExportingStackId": "arn:aws:cloudformation:us-east-1:232762117680:stack/tpl-01-cognito-stack/03a2f9b0-1447-11ee-bcce-0a8c0050d77d",
+            "Name": "tpl-01-user-pool",
+            "Value": "us-east-1_mFMqNTvYk"
+        },
+        {
+            "ExportingStackId": "arn:aws:cloudformation:us-east-1:232762117680:stack/tpl-01-cognito-stack/03a2f9b0-1447-11ee-bcce-0a8c0050d77d",
+            "Name": "tpl-01-user-pool-arn",
+            "Value": "arn:aws:cognito-idp:us-east-1:232762117680:userpool/us-east-1_mFMqNTvYk"
+        },
+        {
+            "ExportingStackId": "arn:aws:cloudformation:us-east-1:232762117680:stack/tpl-01-vpc-stack/c8385f10-1454-11ee-96ef-0a192df2045d",
+            "Name": "tpl-01-vpc",
+            "Value": "vpc-030907bcab817fe07"
+        }
+    ]
+}

@@ -1,0 +1,37 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  Bucket:
+    Type: String
+    
+  Prefix:
+    Type: String
+    Default: tpl-01
+    
+  TaskCpu:
+    Type: Number
+    Default: 512
+    
+  TaskMemory:
+    Type: Number
+    Default: 1024
+
+
+
+## https://${BUCKET}.s3.amazonaws.com/${FOLDER}/template.yaml 
+
+Resources:
+
+  FargateStack:
+    Type: AWS::CloudFormation::Stack
+    # DependsOn:
+    #   - VPCStack
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/${Prefix}/t-fargate.yaml"
+      Parameters:
+        Prefix: !Ref Prefix
+        Subnet1: Fn::ImportValue: !Sub '${Prefix}-public-subnet1'
+        RepositoryName: Fn::ImportValue: !Sub '${Prefix}-erc-repository'
+        TaskCpu: !Ref TaskCpu
+        TaskMemory: !Ref TaskMemory
+

@@ -1,0 +1,89 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  Bucket:
+    Type: String
+    Default: cloudf-bucket
+    
+  Prefix:
+    Type: String
+    Default: tpl-01
+    
+  TaskCpu:
+    Type: Number
+    Default: 512
+    
+  TaskMemory:
+    Type: Number
+    Default: 1024
+
+  ServiceScalingTargetValue:
+    Type: Number
+    Default: 50.0
+
+
+## https://${BUCKET}.s3.amazonaws.com/${FOLDER}/template.yaml 
+
+Resources:
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/${Prefix}/vpc.yaml"
+      Parameters:
+        Prefix: !Ref Prefix
+        AvailabilityZone1: a
+        AvailabilityZone2: b
+        CidrIp1: 10.0.1.0/24
+        CidrIp2: 10.0.2.0/24
+        CidrIp3: 10.0.3.0/24
+        CidrIp4: 10.0.4.0/24        
+        VPCCidrBlock: 10.0.0.0/16
+
+  ALBStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - VPCStack
+    Properties:
+      TemplateURL: !Sub "https://${TemplateBucketName}.s3.${AWS::Region}.amazonaws.com/${Prefix}/alb.yaml"
+      Parameters:
+        Prefix: !Ref Prefix
+        ALBSecurityGroup: !GetAtt VPCStack.Outputs.ALBSecurityGroup
+        PublicSubnet1: !GetAtt VPCStack.Outputs.PublicSubnet1
+        PublicSubnet2: !GetAtt VPCStack.Outputs.PublicSubnet2
+        VPC: !GetAtt VPCStack.Outputs.VPC
+
+  FargateStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - VPCStack
+      - ALBStack
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/${Prefix}/fargate.yaml"
+      Parameters:
+        Prefix: !Ref Prefix
+        ALBTargetGroup: !GetAtt ALBStack.Outputs.ALBTargetGroup
+        ServiceSecurityGroup: !GetAtt VPCStack.Outputs.ServiceSecurityGroup
+        PublicSubnet1: !GetAtt VPCStack.Outputs.PublicSubnet1
+        PublicSubnet2: !GetAtt VPCStack.Outputs.PublicSubnet2
+        RepositoryName: 
+          Fn::ImportValue: !Sub "${Prefix}-erc-repository"
+        TaskCpu: !Ref TaskCpu
+        TaskMemory: !Ref TaskMemory
+
+  FargateScaling:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - FargateStack
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/${Prefix}/scaling.yaml"
+      Parameters:
+        Prefix: !Ref Prefix
+        ServiceScalingTargetValue: !Ref ServiceScalingTargetValue
+        ServiceResourceId: !Sub
+        - 'service/${Cluster}/${Service}'
+        - Cluster: !GetAtt FargateStack.Outputs.FargateCluster
+          Service: !GetAtt FargateStack.Outputs.FargateServiceName
+          
+Outputs:
+  URL:
+    Value: !GetAtt ALBStack.Outputs.URL

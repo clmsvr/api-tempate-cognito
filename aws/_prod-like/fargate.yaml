@@ -1,0 +1,197 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  ServiceSecurityGroup:
+    Type: String
+
+  Prefix:
+    Type: String
+    
+  PublicSubnet1:
+    Type: String
+    
+  PublicSubnet2:
+    Type: String
+    
+  RepositoryName:
+    Type: String
+
+  TaskCpu:
+    Type: Number
+    
+  TaskMemory:
+    Type: Number
+
+  ALBTargetGroup:
+    Type: String
+
+Resources:
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${Prefix}-cluster"
+      
+  #permissao para o fargate baixar imagens do ecr, geerar logs, executar tasks
+  FargateTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  ## Role acima feita de outra forma 
+  # TaskExecutionRole:
+  #   Type: 'AWS::IAM::Role'
+  #   Properties:
+  #     AssumeRolePolicyDocument:
+  #       Statement:
+  #       - Effect: Allow
+  #         Principal:
+  #           Service: 'ecs-tasks.amazonaws.com'
+  #         Action: 'sts:AssumeRole'
+  #     Policies:
+  #     - PolicyName: AmazonECSTaskExecutionRolePolicy # https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_execution_IAM_role.html
+  #       PolicyDocument:
+  #         Statement:
+  #         - Effect: Allow
+  #           Action:
+  #           - 'ecr:GetAuthorizationToken'
+  #           - 'ecr:BatchCheckLayerAvailability'
+  #           - 'ecr:GetDownloadUrlForLayer'
+  #           - 'ecr:BatchGetImage'
+  #           Resource: '*'
+  #         - Effect: Allow
+  #           Action:
+  #           - 'logs:CreateLogStream'
+  #           - 'logs:PutLogEvents'
+  #           Resource: !GetAtt 'LogGroup.Arn'
+
+  #permissões necessarias para a aplicação no container
+  #rds,cognito(sdk),ec3(sdk)
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+  # #exemplo      
+  # TaskRole:
+  #   Type: 'AWS::IAM::Role'
+  #   Properties:
+  #     AssumeRolePolicyDocument:
+  #       Statement:
+  #       - Effect: Allow
+  #         Principal:
+  #           Service: 'ecs-tasks.amazonaws.com'
+  #         Action: 'sts:AssumeRole'
+  #     Policies:
+  #     - PolicyName: S3AccessPolicy
+  #       PolicyDocument:
+  #         Statement:
+  #         - Effect: Allow
+  #           Action:
+  #           - 's3:GetObject'
+  #           - 's3:PutObject'
+  #           - 's3:DeleteObject'
+  #           Resource: !Sub '${Bucket.Arn}/*'
+  #         - Effect: Allow
+  #           Action:
+  #           - 's3:ListBucket'
+  #           Resource: !Sub '${Bucket.Arn}'
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: !Sub ${Prefix}-LogGroup
+      RetentionInDays: 7     
+
+  TaskDefinition1:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !Ref FargateTaskExecutionRole
+      TaskRoleArn: !Ref TaskRole
+      # Family: !Ref 'AWS::StackName'    # A family groups multiple versions of a task definition.
+      ContainerDefinitions:
+        - Name: !Sub "${Prefix}-containerDefinitions1"
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${RepositoryName}:latest"
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: tcp
+          # Memory: 512
+          # MemoryReservation: 256
+          # Essential: true
+          # LogConfiguration:
+          #   LogDriver: awslogs
+          #   Options:
+          #     awslogs-group: !Ref LogGroup
+          #     awslogs-region: !Ref AWS::Region
+          #     awslogs-stream-prefix: !Ref Prefix          
+          # Environment:
+          # - Name: 'PASSWORD'
+          #   Value: !Ref Password
+          # - Name: 'STORE_REGION'
+          #   Value: !Ref 'AWS::Region'
+          # - Name: 'STORE_BUCKET'
+          #   Value: !Ref Bucket
+          # - Name: COOKIE_SECURE
+          #   Value: 'false'
+
+  Service1:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${Prefix}-service1"
+      Cluster: !Ref Cluster
+      LaunchType: FARGATE
+      DesiredCount: 1
+      TaskDefinition: !Ref TaskDefinition1
+      HealthCheckGracePeriodSeconds: 300  # !! The period of time, in seconds, that the Amazon ECS service scheduler ignores unhealthy Elastic Load Balancing target health checks after a task has first started. This is only used when your service is configured to use a load balancer. 
+      PlatformVersion: '1.4.0'            #Livro: From time to time, AWS releases a new Fargate plattform with additional features. We highly recommend specifying a platform version instead of using LATEST to avoid problems in production.
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          # Whether the task's elastic network interface receives a public IP address. The default value is DISABLED.
+          AssignPublicIp: ENABLED     # Livro: When deploying to a public subnet, assigning public IP addresses is required to ensure outbound connectivity.
+          SecurityGroups:
+            - !Ref ServiceSecurityGroup
+          Subnets:
+            - !Ref PublicSubnet1
+            - !Ref PublicSubnet2
+      LoadBalancers:
+        - ContainerName: !Sub "${Prefix}-containerInstance"
+          ContainerPort: 8080
+          TargetGroupArn: !Ref ALBTargetGroup        
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+        DeploymentCircuitBreaker:   #Livro: By enabling the deployment circuit breaker, you ensure that ECS will not try forever to deploy a broken version
+          Enable: true      
+          Rollback: true            # valtar para a ultima versao que funcionou
+
+Outputs:
+  FargateService:
+    Value: !Ref Service1
+
+  FargateServiceName:
+    Value: !GetAtt 'Service1.Name'
+
+  FargateCluster:
+    Value: !Ref Cluster

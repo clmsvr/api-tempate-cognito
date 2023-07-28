@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  Prefix:
+    Type: String
+    
+  ServiceScalingTargetValue:
+    Type: Number
+
+  ServiceResourceId:
+    Type: String
+
+Resources:
+
+  ServiceAutoscaleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              #Service: ecs-tasks.amazonaws.com
+              Service: 'application-autoscaling.amazonaws.com'
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole
+
+  # ServiceAutoscaleRole: 
+  #   Type: 'AWS::IAM::Role'
+  #   Properties:
+  #     AssumeRolePolicyDocument:
+  #       Version: '2012-10-17'
+  #       Statement:
+  #       - Effect: Allow
+  #         Principal:
+  #           Service: 'application-autoscaling.amazonaws.com'
+  #         Action: 'sts:AssumeRole'
+  #     Policies:
+  #     - PolicyName: AmazonEC2ContainerServiceAutoscaleRole
+  #       PolicyDocument:
+  #         Version: '2012-10-17'
+  #         Statement:
+  #         - Effect: Allow
+  #           Action:
+  #           - 'ecs:DescribeServices'
+  #           - 'ecs:UpdateService'
+  #           Resource: '*'
+  #     - PolicyName: cloudwatch
+  #       PolicyDocument:
+  #         Version: '2012-10-17'
+  #         Statement:
+  #         - Effect: Allow
+  #           Action:
+  #           - 'cloudwatch:DescribeAlarms'
+  #           Resource: '*'
+
+
+  ScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 3
+      MinCapacity: 1
+      RoleARN: !GetAtt ServiceAutoscaleRole.Arn
+      ServiceNamespace: ecs
+      ScalableDimension: ecs:service:DesiredCount
+      # This string consists of the resource type and unique identifier. ECS: resource type is 'service' and the unique identifier is the cluster name and service name. Example: service/default/sample-webapp.
+      ResourceId: !Ref ServiceResourceId
+
+  ScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    DependsOn:
+      - ScalableTarget
+    Properties: 
+      PolicyName: ServiceScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ScalableTarget
+      TargetTrackingScalingPolicyConfiguration: 
+        ## DisableScaleIn: false  # default false
+        TargetValue: 50.0       # !Ref ServiceScalingTargetValue   # if the metric is CPU utilization, then the target value is a percent value that represents how much of the CPU can be used before scaling out. 
+                              
+        ScaleInCooldown:  180   # The amount of time, in seconds, after a scale-in activity completes before another scale-in activity can start.
+                                # Livro: After terminating tasks, waits three minutes before reevaluating the situation.
+        ScaleOutCooldown: 120   # The amount of time, in seconds, to wait for a previous scale-out activity to take effect.
+                                # Livro: After starting tasks, waits one minute before reevaluating the situation.
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+      
+

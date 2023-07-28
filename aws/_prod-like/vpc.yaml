@@ -1,0 +1,219 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  AvailabilityZone1:
+    Type: String
+  
+  AvailabilityZone2:
+    Type: String
+    
+  CidrIp1:
+    Type: String
+    
+  CidrIp2:
+    Type: String
+
+  CidrIp3:
+    Type: String
+    
+  CidrIp4:
+    Type: String
+
+  Prefix:
+    Type: String
+    
+  VPCCidrBlock:
+    Type: String
+
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCidrBlock
+
+  IGW:
+    Type: AWS::EC2::InternetGateway
+  
+  IGWAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref IGW
+      
+# Livro:      
+# Traffic between subnets of a VPC is always routed by default. You can’t remove the routes between the subnets. 
+# If you want to prevent traffic between subnets in a VPC, you need to use NACLs attached to the subnets.
+# We do recommend to start with using security groups to control traffic. 
+# If you want to add an extra layer of security, you should use NACLs on top. But doing so is optional.
+
+# Subnets publicas tem uma rota para o IGW
+# Subnets privadas tem uma rota para o NATGateway
+
+# Internet Gateway (IGW) allows instances with public IPs to access the internet.
+# NAT Gateway (NGW) allows instances with no public IPs to access the internet.
+# A comunicação do NGW com a internet também e feita via IGW.
+
+# If data is transferred over the internet to reach AWS services (such as Amazon S3 and Amazon DynamoDB), 
+# use gateway VPC endpoints. These endpoints allow your EC2 instances to communicate with S3 and
+# DynamoDB directly and at no additional charge.
+# A comunicação da rede privada via VPC Endpoins com serviços AWS não precisa do IGW.
+
+# Neste template:
+# 2 subnets publicas
+# 2 subnets privates
+# 1 route table para as 2 subnets publicas
+# 1 route table para as 2 subnets privadas
+
+#########
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref CidrIp1
+      VpcId: !Ref VPC
+      MapPublicIpOnLaunch: true   # Default 'false'.Indicates whether instances launched in this subnet receive a public IPv4 address. 
+                                  # Faz a Subnet ser Pública, juntamente com a rota para o IGW.
+      AvailabilityZone: !Sub "${AWS::Region}${AvailabilityZone1}"
+                        # !Select [0, !GetAZs '']
+                        # Especificar uma string vazia é equivalente a especificar AWS::Region.
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref CidrIp2
+      VpcId: !Ref VPC
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Sub "${AWS::Region}${AvailabilityZone2}"
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      
+  RouteToInternet:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref IGW
+  
+  PublicSubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+      
+  PublicSubnetRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+      
+###########
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref CidrIp3
+      VpcId: !Ref VPC
+      AvailabilityZone: !Sub "${AWS::Region}${AvailabilityZone1}"
+      
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref CidrIp4
+      VpcId: !Ref VPC
+      AvailabilityZone: !Sub "${AWS::Region}${AvailabilityZone2}"
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      
+  PrivateSubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+      
+  PrivateSubnetRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+############ Se precisar de um NAT Gateway
+
+  # RoutePrivateToInternet:
+  #   Type: 'AWS::EC2::Route'
+  #   Properties:
+  #     RouteTableId: !Ref PrivateRouteTable
+  #     DestinationCidrBlock: '0.0.0.0/0'
+  #     NatGatewayId: !Ref NatGateway
+      
+  # EIPNatGateway:
+  #   Type: 'AWS::EC2::EIP'
+  #   Properties:
+  #     Domain: 'vpc'
+
+  # NatGateway:
+  #   Type: 'AWS::EC2::NatGateway'
+  #   Properties:
+  #     AllocationId: !GetAtt 'EIPNatGateway.AllocationId'
+  #     SubnetId: !Ref PublicSubnet1
+
+
+##########
+
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${Prefix}-ALBSecurityGroup
+      GroupDescription: Allow HTTP/HTTPS.
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80   # You can allow a range of ports or set FromPort = ToPort.
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443  
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  ServiceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${Prefix}-ServiceSecurityGroup"
+      GroupDescription: Allow HTTP from ALBSecurityGroup.
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+          # CidrIp: 0.0.0.0/0
+
+Outputs:
+  VPC:
+    Value: !Ref VPC
+      
+  PublicSubnet1:
+    Value: !Ref PublicSubnet1
+      
+  PublicSubnet2:
+    Value: !Ref PublicSubnet2
+      
+  PrivateSubnet1:
+    Value: !Ref PrivateSubnet1
+      
+  PrivateSubnet2:
+    Value: !Ref PrivateSubnet2
+      
+  PrivateRouteTable:
+    Value: !Ref PrivateRouteTable
+
+  ServiceSecurityGroup:
+    Value: !Ref ServiceSecurityGroup
+
+  ALBSecurityGroup:
+    Value: !Ref ALBSecurityGroup

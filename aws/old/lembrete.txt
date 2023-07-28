@@ -1,0 +1,117 @@
+asdfee5tgtSdfddF3TJU
+================================================================================
+PRODUCAO
+AWS S3:
+- criar bucket
+- permitir acesso publico
+AWS IAM
+- criar police associada ao bucket criado anteriormente
+- Permições S3: DeleteObject, PutObject, PutObjectAcl, PutObjectVersionAcl
+- criar usuario para acesso programatico com a police criada acima.
+
+AWS RDS 
+- criar database Mysql com acesso publico
+- configurar security group para acesso 
+- logar no banco de dados com MySql Workbench com usuario "root" 
+- criar um banco/schema para a aplicação (charset utf8mb4)
+- criar um usuario para a aplicação com acesso ao novo schema
+  e todas as permissoes.
+
+REDIS LABS
+-criar database Redis na numvem aws e mesma regiao
+
+ECR
+- criar repositorio
+- (opcional)criar usuario especifico IAM. Managed Policy: AmazonEC2ContainerRegistryPowerUser
+- executar comando aws para login do Docker no ECR (copiar comando)
+- build da  imagen 
+- tag da imagem (copiar comando)
+- push da imagem (copiar comando)
+
+ENVIRONMENT: 
+- configurar as variaveis de ambiente
+------------------------------------------
+SPRING_PROFILES_ACTIVE: PROD
+
+#MYSQL
+DB_HOST_PORT: "?????:3306"
+DB_HOST = 
+SPRING_DATASOURCE_USERNAME = 
+SPRING_DATASOURCE_PASSWORD = 
+
+#STORAGE
+ALGAFOOD_STORAGE_S3_ID_CHAVE_ACESSO = 
+ALGAFOOD_STORAGE_S3_CHAVE_ACESSO_SECRETA = 
+ALGAFOOD_STORAGE_S3_BUCKET = 
+ALGAFOOD_STORAGE_S3_REGIAO = 
+
+#EMAIL
+ALGAFOOD_EMAIL_REMETENTE =
+SPRING_MAIL_HOST = 
+SPRING_MAIL_PORT = 
+SPRING_MAIL_USERNAME = 
+SPRING_MAIL_PASSWORD = 
+
+#LOG
+LOGGLY_TOKEN = 
+
+#SECURITY
+ALGAFOOD_JWT_KEYSTORE_JKS_LOCATION =
+ALGAFOOD_JWT_KEYSTORE_PASSWORD =
+ALGAFOOD_JWT_KEYSTORE_KEYPAIR_ALIAS =
+
+#REDIS
+SPRING_SESSION_STORE_TYPE: redis
+SPRING_DATA_REDIS_HOST = 
+SPRING_DATA_REDIS_PORT = 
+SPRING_DATA_REDIS_PASSWORD = 
+
+---------------------------------------------------
+SYSTEMS MANAGER - PARAMETER STORE
+- definir as variaveis de ambiente fora da task definition com mais segurança.
+/prod/algafood-api-service/<VARIAVEL>
+para todas as variaveis
+---------
+
+AWS LOAD BALANCE  (precisa ser criado antes do Service ECS)
+Listener
+Rules
+Target Groups
+Targets (deixar sem targets - deve-se configura o service para atualizar o LB)
+
+
+ECS
+- Task definitions
+- cluster
+- service
+    - associar o load balancce
+- Task
+    - no security group dos targets dar acesso somente ao security group do load balancer
+
+Problemas
+- se for usar o 'Parameter Store' tem que dar permissao ao Service ECS
+para acessar ao parameter store.
+    - o service ja usa a role 'ecsTaskExecutionRole' ,criada automaticamente.
+    - adicionar inline police: 
+        service: systems manager
+        Action: GetParameter, GetParameters, GetParametersByPath
+        Resource: selecionar especificamente o store criado.
+Problemas:
+- configurar o security group do mysql para acesso do service/task
+- informar o securety group do service para acesso ao mysql
+
+
+Dominio para testes : dev77.cloud
+Podemos criar um registro CNAME para o dominio criado pela aws para o LB
+Ou um reegistro A para o ip bublico do LB
+
+RULE
+Podemos adicionar uma Rule no LB para foward de requisições somente dos requests
+que tiverem no header Host o dominio que criamos.
+
+HTTPS - AWS Certificate Manager
+==================================================================================== 
+
+
+1) dockerfile
+2) ERC

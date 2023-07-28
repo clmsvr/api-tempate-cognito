@@ -1,0 +1,30 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  Prefix:
+    Type: String
+
+Resources:
+  ERCRepository:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: !Sub ${Prefix}-repository
+
+
+Outputs:
+  RepositoryLogin: 
+    Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com
+    Export:
+      Name: !Sub ${Prefix}-erc-repository-login
+
+  RepositoryFullName: 
+    Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Prefix}-repository
+    Export:
+      Name: !Sub ${Prefix}-erc-repository-fullname
+
+  ##https://thomasstep.com/blog/cloudformation-exports-and-imports
+  Repository:
+    Value: !Ref ERCRepository
+    Export:
+      Name: !Sub ${Prefix}-erc-repository-name

@@ -1,0 +1,61 @@
+#!/usr/bin/bash -ex
+
+chmod 744 ./config.sh
+. ./config.sh
+
+
+# STACK=${PREFIX}-ecr-stack
+# TAG=$(aws cloudformation describe-stacks   --stack-name ${STACK} --query "Stacks[0].Outputs" --output text | grep RepositoryFullName | awk '{ print $2}' )
+# LOGIN=$(aws cloudformation describe-stacks --stack-name ${STACK} --query "Stacks[0].Outputs" --output text | grep RepositoryLogin | awk '{ print $2}' )
+# NAME=$(aws cloudformation describe-stacks  --stack-name ${STACK} --query "Stacks[0].Outputs" --output text | grep RepositoryName | awk '{ print $2}' )
+
+TAG="$EcrRepositoryFullname"
+LOGIN="$EcrRepositoryLogin"
+NAME="$EcrRepositoryName"
+
+
+
+# cd ..
+# ./mvnw clean package
+# cd aws || exit 1
+
+if ! rm ./*.jar ;
+then
+    echo "sem .jar para remover"
+fi
+
+if ! cp ../target/*.jar .  ;
+then
+    echo "nao encontrou o JAR da aplicação"
+    exit 1
+fi
+
+if ! docker image build -t "$NAME"  .  --no-cache ;
+then
+    echo "erro criando image"
+    exit 1
+fi
+
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin "$LOGIN"
+docker tag "${NAME}":latest "${TAG}":latest
+docker push "${TAG}":latest
+
+docker image prune -f
+
+
+echo "removing untag images"
+
+# remover untag images
+if ! imageids=$(aws ecr list-images --repository-name $EcrRepositoryName --filter tagStatus=UNTAGGED --query 'imageIds[*]'  --output json  | jq -r '[.[].imageDigest] | map("imageDigest="+.) | join (" ")' ) ;
+then
+    echo falha buscando imagens untagged
+else
+    if [ -n $imageids ]
+    then
+       aws ecr batch-delete-image --repository-name $EcrRepositoryName --image-ids $imageids
+       echo removed
+    fi    
+fi
+
+
+echo FIM

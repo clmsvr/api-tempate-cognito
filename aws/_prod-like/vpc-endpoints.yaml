@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  EndpointSecurityGroup:
+    Type: String
+
+  Prefix:
+    Type: String
+    
+  PrivateRouteTable:
+    Type: String
+    
+  PrivateSubnet1:
+    Type: String
+    
+  PrivateSubnet2:
+    Type: String
+    
+  VPC:
+    Type: String
+    
+
+Resources:
+
+  # EndpointSecurityGroup:
+  #   Type: AWS::EC2::SecurityGroup
+  #   Properties:
+  #     GroupName: !Sub "${Prefix}-EndpointSecurityGroup"
+  #     GroupDescription: Allow HTTPS from ServiceSecurityGroup.
+  #     VpcId: !Ref VPC
+  #     SecurityGroupIngress:
+  #       - IpProtocol: tcp
+  #         FromPort: !Ref HTTPSPort
+  #         ToPort: !Ref HTTPSPort
+  #         SourceSecurityGroupId: !Ref ServiceSecurityGroup
+
+  CloudWatchLogsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref EndpointSecurityGroup
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.logs"
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      VpcEndpointType: Interface
+      VpcId: !Ref VPC
+        
+  ECRDkrEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref EndpointSecurityGroup
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.dkr"
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      VpcEndpointType: Interface
+      VpcId: !Ref VPC
+        
+  ECRApiEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref EndpointSecurityGroup
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.api"
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      VpcEndpointType: Interface
+      VpcId: !Ref VPC
+
+  # Amazon ECR uses Amazon Simple Storage Service (Amazon S3) to store your image layers. 
+  # When your containers download images from Amazon ECR, they must :
+  # - access Amazon ECR to get the image manifest and then 
+  # - access Amazon S3 to download the image layers. 
+  # The following is the Amazon Resource Name (ARN) of the Amazon S3 bucket that contains the layers 
+  # for each Docker image: "arn:aws:s3:::prod-${AWS::Region}-starport-layer-bucket/*"
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      RouteTableIds:
+        - !Ref PrivateRouteTable
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcId: !Ref VPC
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+              - s3:*
+            Resource:
+              - !Sub "arn:aws:s3:::prod-${AWS::Region}-starport-layer-bucket/*"

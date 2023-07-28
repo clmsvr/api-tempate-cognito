@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Cognito User Pool & Clients for Authentication
+
+Parameters:
+  EmailSenderArn:
+    Type: 'String'
+  PoolDomain:
+    Type: 'String'
+  PoolName:
+    Type: 'String'
+
+
+Resources:
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Ref PoolName
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: false
+      MfaConfiguration: "OFF"
+      Policies:
+        PasswordPolicy:
+            MinimumLength: 6
+            RequireLowercase: false
+            RequireNumbers: false
+            RequireSymbols: false
+            RequireUppercase: false
+            TemporaryPasswordValidityDays: 7
+      EmailConfiguration:
+        EmailSendingAccount: DEVELOPER
+        SourceArn: !Ref EmailSenderArn
+      Schema:
+        - AttributeDataType: String
+          Mutable: false
+          Name: email
+          Required: true
+        - AttributeDataType: String
+          Mutable: true
+          Name: name
+          Required: true
+        - Name: phone_number
+          AttributeDataType: String
+          Mutable: false
+          Required: false
+        
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      Domain: !Ref PoolDomain
+      ##CustomDomainConfig:
+
+
+  ResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties: 
+      UserPoolId: !Ref UserPool
+      Name: reseouceServer11
+      Identifier: test-server
+      Scopes: 
+        - ScopeName: read
+          ScopeDescription: Escopo de Leitura
+        - ScopeName: write
+          ScopeDescription: Escopo de Alteracao
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: client11
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      GenerateSecret: true
+      SupportedIdentityProviders:
+        - COGNITO      
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: 
+        - code      
+      AllowedOAuthScopes:
+        - profile
+        - openid
+        - aws.cognito.signin.user.admin
+        - test-server/read
+        - test-server/write
+      CallbackURLs:
+        - https://oauth.pstmn.io/v1/callback
+        - https://oidcdebugger.com/debug
+      TokenValidityUnits:
+        AccessToken: hours 
+        IdToken: hours
+        RefreshToken: days
+      AccessTokenValidity: 2
+      IdTokenValidity: 2
+      RefreshTokenValidity: 30
+      EnableTokenRevocation: true
+      PreventUserExistenceErrors: ENABLED
+      
+Outputs:
+  UserPoolID:
+    Value: !Ref UserPool
+    Description: The UserPool ID
+  UserPoolARN:
+    Value: !GetAtt UserPool.Arn
+    Description: The UserPool Arn    
+
+        

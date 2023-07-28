@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  Bucket:
+    Type: String
+  Prefix:
+    Type: String
+  EmailSenderArn:
+    Type: 'String'
+  PoolDomain:
+    Type: 'String'
+  DBUsername:
+    Type: 'String'
+  DBPassword:
+    Type: 'String'
+
+## https://${BUCKET}.s3.amazonaws.com/${FOLDER}/template.yaml 
+
+Resources:
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/${Prefix}/t-vpc.yaml"
+      Parameters:
+        Prefix: !Ref Prefix
+        VPCCidrBlock: 10.0.0.0/16
+        CidrIp1: 10.0.1.0/24      
+
+  RDSStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - VPCStack
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/${Prefix}/t-rds.yaml"
+      Parameters:
+        Prefix: !Ref Prefix
+        VPC: !GetAtt VPCStack.Outputs.VPC
+        Subnet1:  !GetAtt VPCStack.Outputs.PublicSubnet1
+        Username: !Ref DBUsername
+        Password: !Ref DBPassword
+
+  CognitoStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - VPCStack
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/${Prefix}/t-cognito.yaml"
+      Parameters:
+        EmailSenderArn: !Ref EmailSenderArn
+        PoolDomain: !Ref PoolDomain
+        PoolName: !Sub ${Prefix}-pool
